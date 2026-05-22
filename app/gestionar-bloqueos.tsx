@@ -9,8 +9,6 @@ import {
   Button,
 } from 'react-native';
 
-import * as SecureStore from 'expo-secure-store';
-
 import { api } from '../services/api';
 
 type Horario = {
@@ -41,22 +39,11 @@ export default function GestionarBloqueosScreen() {
     `${String(ahora.getMonth() + 1).padStart(2, '0')}-` +
     `${String(ahora.getDate()).padStart(2, '0')}`;
 
-  const [fecha, setFecha] =
-    useState(fechaHoy);
-
-  const [horarios, setHorarios] =
-    useState<Horario[]>([]);
-
-  const [usuario, setUsuario] =
-    useState<Usuario | null>(null);
-
-  const [profesionales, setProfesionales] =
-    useState<Profesional[]>([]);
-
-  const [
-    profesionalId,
-    setProfesionalId,
-  ] = useState<number | null>(null);
+  const [fecha, setFecha] = useState(fechaHoy);
+  const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [profesionales, setProfesionales] = useState<Profesional[]>([]);
+  const [profesionalId, setProfesionalId] = useState<number | null>(null);
 
   useEffect(() => {
     cargarUsuario();
@@ -69,437 +56,188 @@ export default function GestionarBloqueosScreen() {
   }, [fecha, profesionalId]);
 
   function cambiarDia(dias: number) {
-    const nuevaFecha = new Date(
-      fecha + 'T00:00:00',
-    );
+    const nuevaFecha = new Date(fecha + 'T00:00:00');
 
-    nuevaFecha.setDate(
-      nuevaFecha.getDate() + dias,
-    );
+    nuevaFecha.setDate(nuevaFecha.getDate() + dias);
 
     const nuevaFechaTexto =
       `${nuevaFecha.getFullYear()}-` +
-      `${String(
-        nuevaFecha.getMonth() + 1,
-      ).padStart(2, '0')}-` +
-      `${String(
-        nuevaFecha.getDate(),
-      ).padStart(2, '0')}`;
+      `${String(nuevaFecha.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(nuevaFecha.getDate()).padStart(2, '0')}`;
 
-    if (nuevaFechaTexto < fechaHoy) {
-      return;
-    }
+    if (nuevaFechaTexto < fechaHoy) return;
 
     setFecha(nuevaFechaTexto);
   }
 
   async function cargarUsuario() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
-
-      const response =
-        await api.get('/auth/me', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      const response = await api.get('/auth/me');
 
       setUsuario(response.data);
 
-      if (
-        response.data.rol ===
-        'PROFESIONAL'
-      ) {
-        setProfesionalId(
-          response.data.profesional.id,
-        );
+      if (response.data.rol === 'PROFESIONAL') {
+        setProfesionalId(response.data.profesional.id);
       }
 
-      if (
-        response.data.rol ===
-        'ADMIN'
-      ) {
+      if (response.data.rol === 'ADMIN') {
         cargarProfesionales();
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
+      Alert.alert('Error', 'No se pudo cargar usuario');
     }
   }
 
   async function cargarProfesionales() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
-
-      const response = await api.get(
-        '/users/profesionales',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
+      const response = await api.get('/users/profesionales');
       setProfesionales(response.data);
 
       if (response.data.length > 0) {
-        setProfesionalId(
-          response.data[0].id,
-        );
+        setProfesionalId(response.data[0].id);
       }
-    } catch (error) {
-      console.log(error);
+    } catch {
+      Alert.alert('Error', 'No se pudieron cargar profesionales');
     }
   }
 
   async function cargarHorarios() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
-
       const response = await api.get(
         `/citas/disponibles?fecha=${fecha}&profesionalId=${profesionalId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
       );
 
       setHorarios(response.data);
-    } catch (error: any) {
-      console.log(
-        error?.response?.data || error,
-      );
-
-      Alert.alert(
-        'Error',
-        'No se pudieron cargar horarios',
-      );
+    } catch {
+      Alert.alert('Error', 'No se pudieron cargar horarios');
     }
   }
 
-  async function bloquearSlot(
-    hora: string,
-  ) {
+  async function bloquearSlot(hora: string) {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
-
-      await api.post(
-        '/citas/bloquear-slot',
-        {
-          fechaHora:
-            `${fecha}T${hora}:00`,
-
-          profesionalId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+      await api.post('/citas/bloquear-slot', {
+        fechaHora: `${fecha}T${hora}:00`,
+        profesionalId,
+      });
 
       cargarHorarios();
     } catch (error: any) {
-      console.log(
-        error?.response?.data || error,
-      );
-
       Alert.alert(
         'Error',
-        JSON.stringify(
-          error?.response?.data || error,
-        ),
+        error?.response?.data?.message || 'No se pudo bloquear',
       );
     }
   }
 
-  async function desbloquearSlot(
-    bloqueoId: number,
-  ) {
+  async function desbloquearSlot(bloqueoId: number) {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
-
       await api.delete(
         `/citas/dias-bloqueados/${bloqueoId}?profesionalId=${profesionalId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
       );
 
       cargarHorarios();
     } catch (error: any) {
-      console.log(
-        error?.response?.data || error,
-      );
-
       Alert.alert(
         'Error',
-        JSON.stringify(
-          error?.response?.data || error,
-        ),
+        error?.response?.data?.message || 'No se pudo desbloquear',
       );
     }
   }
 
   async function bloquearDiaCompleto() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
+      await api.post('/citas/bloquear-dia', {
+        fecha,
+        profesionalId,
+      });
 
-      await api.post(
-        '/citas/bloquear-dia',
-        {
-          fecha,
-          profesionalId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      Alert.alert(
-        'Éxito',
-        'Día bloqueado',
-      );
-
+      Alert.alert('Éxito', 'Día bloqueado');
       cargarHorarios();
     } catch (error: any) {
-      console.log(
-        error?.response?.data || error,
-      );
-
       Alert.alert(
         'Error',
-        JSON.stringify(
-          error?.response?.data || error,
-        ),
+        error?.response?.data?.message || 'No se pudo bloquear',
       );
     }
   }
 
   async function desbloquearDiaCompleto() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
+      const bloqueados = horarios.filter(
+        (h) => h.bloqueado && h.bloqueoId,
+      );
 
-      const bloqueados =
-        horarios.filter(
-          (h) =>
-            h.bloqueado &&
-            h.bloqueoId,
-        );
-
-      for (const horario of bloqueados) {
+      for (const h of bloqueados) {
         await api.delete(
-          `/citas/dias-bloqueados/${horario.bloqueoId}?profesionalId=${profesionalId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
+          `/citas/dias-bloqueados/${h.bloqueoId}?profesionalId=${profesionalId}`,
         );
       }
 
-      Alert.alert(
-        'Éxito',
-        'Día desbloqueado',
-      );
-
+      Alert.alert('Éxito', 'Día desbloqueado');
       cargarHorarios();
     } catch (error: any) {
-      console.log(
-        error?.response?.data || error,
-      );
-
       Alert.alert(
         'Error',
-        JSON.stringify(
-          error?.response?.data || error,
-        ),
+        error?.response?.data?.message || 'No se pudo desbloquear',
       );
     }
   }
 
+  if (!usuario) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Cargando...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 20,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: 'bold',
-        }}
-      >
-        Gestionar bloqueos
+    <View style={{ flex: 1, padding: 20 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
+        Gestionar agenda
       </Text>
 
-      {usuario?.rol === 'ADMIN' && (
-        <View
-          style={{
-            marginTop: 20,
-            gap: 10,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 'bold',
-            }}
-          >
-            Profesional
-          </Text>
-
-          {profesionales.map(
-            (profesional) => (
-              <TouchableOpacity
-                key={profesional.id}
-                onPress={() =>
-                  setProfesionalId(
-                    profesional.id,
-                  )
-                }
-                style={{
-                  padding: 12,
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  backgroundColor:
-                    profesionalId ===
-                    profesional.id
-                      ? '#dbeafe'
-                      : 'white',
-                }}
-              >
-                <Text
-                  style={{
-                    fontWeight:
-                      'bold',
-                  }}
-                >
-                  {
-                    profesional.nombre
-                  }
-                </Text>
-
-                <Text>
-                  {
-                    profesional.especialidad
-                  }
-                </Text>
-              </TouchableOpacity>
-            ),
-          )}
+      {usuario.rol === 'ADMIN' && (
+        <View style={{ marginTop: 20, gap: 10 }}>
+          {profesionales.map((p) => (
+            <TouchableOpacity
+              key={p.id}
+              onPress={() => setProfesionalId(p.id)}
+              style={{
+                padding: 10,
+                borderWidth: 1,
+                borderRadius: 8,
+                backgroundColor:
+                  profesionalId === p.id ? '#dbeafe' : 'white',
+              }}
+            >
+              <Text>{p.nombre}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent:
-            'space-between',
-          alignItems: 'center',
-          marginTop: 20,
-        }}
-      >
-        <Button
-          title="←"
-          onPress={() =>
-            cambiarDia(-1)
-          }
-        />
-
-        <Text
-          style={{
-            fontSize: 18,
-          }}
-        >
-          {fecha}
-        </Text>
-
-        <Button
-          title="→"
-          onPress={() =>
-            cambiarDia(1)
-          }
-        />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
+        <Button title="←" onPress={() => cambiarDia(-1)} />
+        <Text>{fecha}</Text>
+        <Button title="→" onPress={() => cambiarDia(1)} />
       </View>
 
-      <View
-        style={{
-          marginTop: 20,
-          gap: 10,
-        }}
-      >
-        <Button
-          title="Bloquear día completo"
-          onPress={
-            bloquearDiaCompleto
-          }
-        />
-
-        <Button
-          title="Desbloquear día completo"
-          onPress={
-            desbloquearDiaCompleto
-          }
-        />
+      <View style={{ marginTop: 20, gap: 10 }}>
+        <Button title="Bloquear día" onPress={bloquearDiaCompleto} />
+        <Button title="Desbloquear día" onPress={desbloquearDiaCompleto} />
       </View>
 
-      <ScrollView
-        style={{
-          marginTop: 20,
-        }}
-      >
-        {horarios.map((horario) => (
+      <ScrollView style={{ marginTop: 20 }}>
+        {horarios.map((h) => (
           <TouchableOpacity
-            key={horario.hora}
-            disabled={
-              !horario.disponible &&
-              !horario.bloqueado
-            }
+            key={h.hora}
+            disabled={!h.disponible && !h.bloqueado}
             onPress={() => {
-              if (
-                horario.bloqueado &&
-                horario.bloqueoId
-              ) {
-                desbloquearSlot(
-                  horario.bloqueoId,
-                );
-
-                return;
-              }
-
-              if (
-                horario.disponible
-              ) {
-                bloquearSlot(
-                  horario.hora,
-                );
+              if (h.bloqueado && h.bloqueoId) {
+                desbloquearSlot(h.bloqueoId);
+              } else if (h.disponible) {
+                bloquearSlot(h.hora);
               }
             }}
             style={{
@@ -507,36 +245,22 @@ export default function GestionarBloqueosScreen() {
               borderWidth: 1,
               borderRadius: 8,
               marginBottom: 10,
-
               opacity:
-                !horario.disponible &&
-                !horario.bloqueado
-                  ? 0.5
-                  : 1,
-
-              backgroundColor:
-                horario.bloqueado
-                  ? '#fecaca'
-                  : horario.disponible
-                    ? '#dcfce7'
-                    : '#dcdcdc',
+                !h.disponible && !h.bloqueado ? 0.5 : 1,
+              backgroundColor: h.bloqueado
+                ? '#fecaca'
+                : h.disponible
+                ? '#dcfce7'
+                : '#dcdcdc',
             }}
           >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: 'bold',
-              }}
-            >
-              {horario.hora}
-            </Text>
-
+            <Text style={{ fontSize: 18 }}>{h.hora}</Text>
             <Text>
-              {horario.bloqueado
+              {h.bloqueado
                 ? 'Bloqueado'
-                : horario.disponible
-                  ? 'Disponible'
-                  : 'Ocupado'}
+                : h.disponible
+                ? 'Disponible'
+                : 'Ocupado'}
             </Text>
           </TouchableOpacity>
         ))}

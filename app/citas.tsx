@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   ScrollView,
 } from 'react-native';
 
-import * as SecureStore from 'expo-secure-store';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { api } from '../services/api';
+
+type Usuario = {
+  rol: string;
+};
 
 type Cita = {
   id: number;
@@ -27,55 +30,44 @@ type Cita = {
 export default function CitasScreen() {
   const router = useRouter();
 
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [citas, setCitas] = useState<Cita[]>([]);
+
+  useEffect(() => {
+    validarUsuario();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      cargarCitas();
-    }, []),
+      if (usuario) cargarCitas();
+    }, [usuario]),
   );
+
+  async function validarUsuario() {
+    try {
+      const res = await api.get('/auth/me');
+      setUsuario(res.data);
+    } catch {
+      Alert.alert('Error', 'Sesión inválida');
+      router.replace('/');
+    }
+  }
 
   async function cargarCitas() {
     try {
-      const token = await SecureStore.getItemAsync('token');
-
-      if (!token) {
-        router.replace('/');
-        return;
-      }
-
-      const response = await api.get('/citas', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+      const response = await api.get('/citas');
       setCitas(response.data);
-    } catch (error) {
-      console.log(error);
+    } catch {
       Alert.alert('Error', 'No se pudieron cargar las citas');
     }
   }
 
   async function cancelarCita(id: number) {
     try {
-      const token = await SecureStore.getItemAsync('token');
-
-      await api.patch(
-        `/citas/${id}/cancelar`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
+      await api.patch(`/citas/${id}/cancelar`);
       Alert.alert('Éxito', 'Cita cancelada');
-
       cargarCitas();
-    } catch (error) {
-      console.log(error);
+    } catch {
       Alert.alert('Error', 'No se pudo cancelar la cita');
     }
   }
@@ -84,16 +76,21 @@ export default function CitasScreen() {
     switch (estado) {
       case 'PENDIENTE':
         return '#fff7cc';
-
       case 'CANCELADA':
         return '#dcdcdc';
-
       case 'CONFIRMADA':
         return '#c8f7c5';
-
       default:
         return 'white';
     }
+  }
+
+  if (!usuario) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Cargando...</Text>
+      </View>
+    );
   }
 
   return (
@@ -120,8 +117,7 @@ export default function CitasScreen() {
               <Text>ID: {cita.id}</Text>
 
               <Text>
-                Fecha:{' '}
-                {new Date(cita.fechaHora).toLocaleString()}
+                Fecha: {new Date(cita.fechaHora).toLocaleString()}
               </Text>
 
               <Text>Estado: {cita.estado}</Text>
@@ -148,10 +144,7 @@ export default function CitasScreen() {
         )}
       </ScrollView>
 
-      <Button
-        title="Volver al inicio"
-        onPress={() => router.back()}
-      />
+      <Button title="Volver" onPress={() => router.back()} />
     </View>
   );
 }

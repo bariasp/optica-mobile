@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
-
-import {
-  View,
-  Text,
-  Button,
-  Alert,
-} from 'react-native';
+import { View, Text, Button, Alert } from 'react-native';
 
 import * as SecureStore from 'expo-secure-store';
-
 import { useRouter } from 'expo-router';
-
 import { api } from '../services/api';
 
 type Usuario = {
@@ -22,9 +14,7 @@ type Usuario = {
 
 export default function HomeScreen() {
   const router = useRouter();
-
-  const [usuario, setUsuario] =
-    useState<Usuario | null>(null);
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
 
   useEffect(() => {
     cargarUsuario();
@@ -32,158 +22,101 @@ export default function HomeScreen() {
 
   async function cargarUsuario() {
     try {
-      const token =
-        await SecureStore.getItemAsync(
-          'token',
-        );
+      const token = await SecureStore.getItemAsync('token');
 
       if (!token) {
         router.replace('/');
-
         return;
       }
 
-      const response = await api.get(
-        '/auth/me',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
+      const response = await api.get('/auth/me');
       setUsuario(response.data);
-    } catch (error) {
-      console.log(error);
-
-      Alert.alert(
-        'Error',
-        'No se pudo cargar el usuario',
-      );
-
-      await SecureStore.deleteItemAsync(
-        'token',
-      );
-
+    } catch {
+      Alert.alert('Error', 'Sesión inválida');
+      await SecureStore.deleteItemAsync('token');
       router.replace('/');
     }
   }
 
   async function handleLogout() {
-    await SecureStore.deleteItemAsync(
-      'token',
-    );
-
+    await SecureStore.deleteItemAsync('token');
     router.replace('/');
   }
 
+  if (!usuario) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Cargando...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        padding: 20,
-        gap: 12,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: 'bold',
-        }}
-      >
+    <View style={{ flex: 1, padding: 20, gap: 12 }}>
+      <Text style={{ fontSize: 26, fontWeight: 'bold' }}>
         Óptica Zeus
       </Text>
 
-      {usuario ? (
-        <View style={{ gap: 6 }}>
-          <Text>
-            Nombre: {usuario.nombre}
-          </Text>
+      <Text>Hola, {usuario.nombre}</Text>
+      <Text>Rol: {usuario.rol}</Text>
 
-          <Text>
-            Email: {usuario.email}
-          </Text>
+      <View style={{ marginTop: 20, gap: 10 }}>
+        <Button title="Ver citas" onPress={() => router.push('/citas')} />
 
-          <Text>
-            Rol: {usuario.rol}
-          </Text>
-        </View>
-      ) : (
-        <Text>Cargando usuario...</Text>
-      )}
-
-      <Button
-        title="Ver citas"
-        onPress={() =>
-          router.push('/citas')
-        }
-      />
-
-      {usuario?.rol === 'PACIENTE' && (
-        <Button
-          title="Reservar hora"
-          onPress={() =>
-            router.push('/reservar')
-          }
-        />
-      )}
-
-      {usuario?.rol === 'PROFESIONAL' && (
-        <Button
-          title="Gestionar bloqueos"
-          onPress={() =>
-            router.push(
-              '/gestionar-bloqueos',
-            )
-          }
-        />
-      )}
-
-      {usuario?.rol === 'ADMIN' && (
-        <>
+        {usuario.rol === 'PACIENTE' && (
           <Button
-            title="Reservar para paciente"
-            onPress={() =>
-              router.push(
-                '/reservar-admin',
-              )
-            }
+            title="Reservar hora"
+            onPress={() => router.push('/reservar')}
           />
+        )}
 
-          <Button
-            title="Gestionar bloqueos"
-            onPress={() =>
-              router.push(
-                '/gestionar-bloqueos',
-              )
-            }
-          />
+        {usuario.rol === 'PROFESIONAL' && (
+          <>
+            <Button
+              title="Gestionar agenda"
+              onPress={() => router.push('/gestionar-bloqueos')}
+            />
 
-          <Button
-            title="Crear paciente"
-            onPress={() =>
-              router.push(
-                '/crear-paciente',
-              )
-            }
-          />
+            <Button
+              title="Panel interno"
+              onPress={() => router.push('/panel-interno')}
+            />
+          </>
+        )}
 
-          <Button
-            title="Crear profesional"
-            onPress={() =>
-              router.push(
-                '/crear-profesional',
-              )
-            }
-          />
-        </>
-      )}
+        {usuario.rol === 'ADMIN' && (
+          <>
+            <Button
+              title="Reservar para paciente"
+              onPress={() => router.push('/reservar-admin')}
+            />
 
-      <Button
-        title="Cerrar sesión"
-        onPress={handleLogout}
-      />
+            <Button
+              title="Gestionar agenda"
+              onPress={() => router.push('/gestionar-bloqueos')}
+            />
+
+            <Button
+              title="Panel interno"
+              onPress={() => router.push('/panel-interno')}
+            />
+
+            <Button
+              title="Crear paciente"
+              onPress={() => router.push('/crear-paciente')}
+            />
+
+            <Button
+              title="Crear profesional"
+              onPress={() => router.push('/crear-profesional')}
+            />
+          </>
+        )}
+      </View>
+
+      <View style={{ marginTop: 30 }}>
+        <Button title="Cerrar sesión" onPress={handleLogout} />
+      </View>
     </View>
   );
 }
