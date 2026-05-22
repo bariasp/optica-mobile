@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 export const api = axios.create({
-  baseURL: 'http://192.168.1.85:3000',
+  baseURL: 'https://optica-zeus-backend.fly.dev',
 });
 
 // Interceptor para agregar el token automáticamente
