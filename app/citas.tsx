@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  Button,
   Alert,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 
 import { useRouter, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { api } from '../services/api';
+import { colors, shadows } from '../constants/theme';
 
 type Usuario = {
   rol: string;
@@ -20,6 +23,7 @@ type Cita = {
   estado: string;
   paciente?: {
     nombre: string;
+    rut?: string;
   };
   profesional?: {
     nombre: string;
@@ -32,6 +36,7 @@ export default function CitasScreen() {
 
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [citas, setCitas] = useState<Cita[]>([]);
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     validarUsuario();
@@ -55,11 +60,25 @@ export default function CitasScreen() {
 
   async function cargarCitas() {
     try {
+      setCargando(true);
       const response = await api.get('/citas');
       setCitas(response.data);
     } catch {
       Alert.alert('Error', 'No se pudieron cargar las citas');
+    } finally {
+      setCargando(false);
     }
+  }
+
+  function confirmarCancelacion(id: number) {
+    Alert.alert(
+      'Cancelar cita',
+      '¿Estás seguro de que quieres cancelar esta cita?',
+      [
+        { text: 'No', style: 'cancel' },
+        { text: 'Sí, cancelar', style: 'destructive', onPress: () => cancelarCita(id) },
+      ],
+    );
   }
 
   async function cancelarCita(id: number) {
@@ -72,79 +91,260 @@ export default function CitasScreen() {
     }
   }
 
-  function getColorEstado(estado: string) {
-    switch (estado) {
-      case 'PENDIENTE':
-        return '#fff7cc';
-      case 'CANCELADA':
-        return '#dcdcdc';
-      case 'CONFIRMADA':
-        return '#c8f7c5';
-      default:
-        return 'white';
-    }
+  function formatearFecha(fecha: string) {
+    return new Date(fecha).toLocaleDateString();
   }
 
-  if (!usuario) {
+  function formatearHora(fecha: string) {
+    return new Date(fecha).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  function estadoStyle(estado: string) {
+    if (estado === 'PENDIENTE') return estadoPendiente;
+    if (estado === 'CONFIRMADA') return estadoConfirmada;
+    if (estado === 'CANCELADA') return estadoCancelada;
+    return estadoBase;
+  }
+
+  if (!usuario || cargando) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Cargando...</Text>
+      <View style={centerStyle}>
+        <Text>Cargando citas...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
-        Mis citas
-      </Text>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        style={heroStyle}
+      >
+        <Text style={heroTitle}>Mis citas</Text>
+        <Text style={heroSubtitle}>
+          Revisa tus horas agendadas y su estado
+        </Text>
+      </LinearGradient>
 
-      <ScrollView style={{ marginTop: 20 }}>
+      <View style={contentStyle}>
         {citas.length === 0 ? (
-          <Text>No tienes citas registradas.</Text>
+          <View style={emptyCard}>
+            <Text style={emptyTitle}>No hay citas registradas</Text>
+            <Text style={emptyText}>
+              Cuando exista una hora agendada, aparecerá en esta sección.
+            </Text>
+          </View>
         ) : (
           citas.map((cita) => (
-            <View
-              key={cita.id}
-              style={{
-                padding: 12,
-                borderWidth: 1,
-                borderRadius: 8,
-                marginBottom: 10,
-                backgroundColor: getColorEstado(cita.estado),
-              }}
-            >
-              <Text>ID: {cita.id}</Text>
+            <View key={cita.id} style={cardStyle}>
+              <View style={cardHeader}>
+                <View>
+                  <Text style={dateText}>{formatearFecha(cita.fechaHora)}</Text>
+                  <Text style={hourText}>{formatearHora(cita.fechaHora)}</Text>
+                </View>
 
-              <Text>
-                Fecha: {new Date(cita.fechaHora).toLocaleString()}
+                <View style={estadoStyle(cita.estado)}>
+                  <Text style={estadoText}>{cita.estado}</Text>
+                </View>
+              </View>
+
+              <View style={divider} />
+
+              <Text style={label}>Paciente</Text>
+              <Text style={value}>{cita.paciente?.nombre || 'Sin paciente'}</Text>
+
+              {cita.paciente?.rut && (
+                <>
+                  <Text style={label}>RUT</Text>
+                  <Text style={value}>{cita.paciente.rut}</Text>
+                </>
+              )}
+
+              <Text style={label}>Profesional</Text>
+              <Text style={value}>
+                {cita.profesional?.nombre || 'Sin profesional'}
               </Text>
 
-              <Text>Estado: {cita.estado}</Text>
-
-              <Text>
-                Paciente: {cita.paciente?.nombre}
-              </Text>
-
-              <Text>
-                Profesional: {cita.profesional?.nombre} -{' '}
-                {cita.profesional?.especialidad}
+              <Text style={label}>Especialidad</Text>
+              <Text style={value}>
+                {cita.profesional?.especialidad || 'Sin especialidad'}
               </Text>
 
               {cita.estado === 'PENDIENTE' && (
-                <View style={{ marginTop: 10 }}>
-                  <Button
-                    title="Cancelar cita"
-                    onPress={() => cancelarCita(cita.id)}
-                  />
-                </View>
+                <TouchableOpacity
+                  onPress={() => confirmarCancelacion(cita.id)}
+                  style={cancelButton}
+                >
+                  <Text style={cancelButtonText}>Cancelar cita</Text>
+                </TouchableOpacity>
               )}
             </View>
           ))
         )}
-      </ScrollView>
 
-      <Button title="Volver" onPress={() => router.back()} />
-    </View>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={backButton}
+        >
+          <Text style={backButtonText}>Volver</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
+
+const centerStyle = {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+} as const;
+
+const heroStyle = {
+  paddingTop: 46,
+  paddingBottom: 34,
+  paddingHorizontal: 24,
+  borderBottomLeftRadius: 34,
+  borderBottomRightRadius: 34,
+} as const;
+
+const heroTitle = {
+  color: 'white',
+  fontSize: 28,
+  fontWeight: 'bold',
+} as const;
+
+const heroSubtitle = {
+  color: 'white',
+  marginTop: 8,
+  fontSize: 15,
+} as const;
+
+const contentStyle = {
+  padding: 20,
+} as const;
+
+const cardStyle = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  marginBottom: 14,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const cardHeader = {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+} as const;
+
+const dateText = {
+  color: colors.muted,
+  fontSize: 13,
+} as const;
+
+const hourText = {
+  color: colors.text,
+  fontSize: 24,
+  fontWeight: 'bold',
+  marginTop: 2,
+} as const;
+
+const divider = {
+  height: 1,
+  backgroundColor: colors.border,
+  marginVertical: 12,
+} as const;
+
+const label = {
+  color: colors.muted,
+  fontSize: 12,
+  marginTop: 6,
+} as const;
+
+const value = {
+  color: colors.text,
+  fontSize: 15,
+  fontWeight: '600',
+} as const;
+
+const estadoBase = {
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  borderRadius: 999,
+  backgroundColor: colors.disabled,
+} as const;
+
+const estadoPendiente = {
+  ...estadoBase,
+  backgroundColor: colors.warning,
+} as const;
+
+const estadoConfirmada = {
+  ...estadoBase,
+  backgroundColor: colors.success,
+} as const;
+
+const estadoCancelada = {
+  ...estadoBase,
+  backgroundColor: colors.disabled,
+} as const;
+
+const estadoText = {
+  fontSize: 11,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const cancelButton = {
+  marginTop: 16,
+  backgroundColor: colors.danger,
+  padding: 13,
+  borderRadius: 14,
+  alignItems: 'center',
+} as const;
+
+const cancelButtonText = {
+  color: colors.primaryDark,
+  fontWeight: 'bold',
+} as const;
+
+const backButton = {
+  backgroundColor: colors.card,
+  padding: 15,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 10,
+  marginBottom: 30,
+  borderWidth: 1,
+  borderColor: colors.border,
+} as const;
+
+const backButtonText = {
+  color: colors.primary,
+  fontWeight: 'bold',
+} as const;
+
+const emptyCard = {
+  backgroundColor: colors.card,
+  padding: 20,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const emptyTitle = {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const emptyText = {
+  color: colors.muted,
+  marginTop: 6,
+} as const;

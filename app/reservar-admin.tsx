@@ -5,10 +5,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Button,
 } from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { api } from '../services/api';
+import { colors, shadows } from '../constants/theme';
 
 type Paciente = {
   id: number;
@@ -32,6 +34,13 @@ type Usuario = {
   rol: string;
 };
 
+function construirFechaHoraISO(fecha: string, hora: string) {
+  const [year, month, day] = fecha.split('-').map(Number);
+  const [hours, minutes] = hora.split(':').map(Number);
+
+  return new Date(year, month - 1, day, hours, minutes, 0, 0).toISOString();
+}
+
 export default function ReservarAdminScreen() {
   const ahora = new Date();
 
@@ -52,6 +61,7 @@ export default function ReservarAdminScreen() {
     useState<Profesional | null>(null);
 
   const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
     validarAdmin();
@@ -133,6 +143,8 @@ export default function ReservarAdminScreen() {
     if (!profesionalSeleccionado) return;
 
     try {
+      setCargando(true);
+
       const response = await api.get(
         `/citas/disponibles?fecha=${fecha}&profesionalId=${profesionalSeleccionado.id}`,
       );
@@ -140,6 +152,8 @@ export default function ReservarAdminScreen() {
       setHorarios(response.data);
     } catch {
       Alert.alert('Error', 'No se pudieron cargar horarios');
+    } finally {
+      setCargando(false);
     }
   }
 
@@ -152,11 +166,13 @@ export default function ReservarAdminScreen() {
     }
 
     try {
-      await api.post('/citas', {
-        fechaHora: `${fecha}T${hora}:00`,
-        profesionalId: profesionalSeleccionado.id,
-        pacienteId: pacienteSeleccionado.id,
-      });
+  const fechaHora = construirFechaHoraISO(fecha, hora);
+
+  await api.post('/citas', {
+    fechaHora,
+    profesionalId: profesionalSeleccionado.id,
+    pacienteId: pacienteSeleccionado.id,
+  });
 
       Alert.alert('Éxito', 'Hora reservada para paciente');
       cargarHorarios();
@@ -168,185 +184,366 @@ export default function ReservarAdminScreen() {
     }
   }
 
+  function limpiarSeleccion() {
+    setPacienteSeleccionado(null);
+    setProfesionalSeleccionado(null);
+    setHorarios([]);
+  }
+
   if (usuario && usuario.rol !== 'ADMIN') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={centerStyle}>
         <Text>Acceso restringido</Text>
       </View>
     );
   }
 
-  if (!pacienteSeleccionado) {
-    return (
-      <View style={{ flex: 1, padding: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
-          Seleccionar paciente
-        </Text>
-
-        <ScrollView style={{ marginTop: 20 }}>
-          {pacientes.map((paciente) => (
-            <TouchableOpacity
-              key={paciente.id}
-              onPress={() => setPacienteSeleccionado(paciente)}
-              style={{
-                padding: 15,
-                borderWidth: 1,
-                borderRadius: 8,
-                marginBottom: 10,
-                backgroundColor: 'white',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-                {paciente.nombre}
-              </Text>
-              <Text>{paciente.rut}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (!profesionalSeleccionado) {
-    return (
-      <View style={{ flex: 1, padding: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
-          Seleccionar profesional
-        </Text>
-
-        <Text style={{ marginTop: 10 }}>
-          Paciente: {pacienteSeleccionado.nombre}
-        </Text>
-
-        <ScrollView style={{ marginTop: 20 }}>
-          {profesionales.map((profesional) => (
-            <TouchableOpacity
-              key={profesional.id}
-              onPress={() => setProfesionalSeleccionado(profesional)}
-              style={{
-                padding: 15,
-                borderWidth: 1,
-                borderRadius: 8,
-                marginBottom: 10,
-                backgroundColor: 'white',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-                {profesional.nombre}
-              </Text>
-              <Text>{profesional.especialidad}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Button
-          title="Cambiar paciente"
-          onPress={() => {
-            setPacienteSeleccionado(null);
-            setProfesionalSeleccionado(null);
-            setHorarios([]);
-          }}
-        />
-      </View>
-    );
-  }
-
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
-        Reservar hora
-      </Text>
-
-      <Text style={{ marginTop: 10 }}>
-        Paciente: {pacienteSeleccionado.nombre}
-      </Text>
-
-      <Text>
-        Profesional: {profesionalSeleccionado.nombre}
-      </Text>
-
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: 20,
-        }}
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        style={heroStyle}
       >
-        <Button title="←" onPress={() => cambiarDia(-1)} />
+        <Text style={heroTitle}>Reservar para paciente</Text>
+        <Text style={heroSubtitle}>
+          Selecciona paciente, profesional y horario
+        </Text>
+      </LinearGradient>
 
-        <Text style={{ fontSize: 18 }}>{fecha}</Text>
+      <View style={contentStyle}>
+        {!pacienteSeleccionado && (
+          <>
+            <Text style={sectionTitle}>Seleccionar paciente</Text>
 
-        <Button title="→" onPress={() => cambiarDia(1)} />
-      </View>
-
-      <ScrollView style={{ marginTop: 20 }}>
-        {horarios.length === 0 ? (
-          <Text>No hay horarios disponibles.</Text>
-        ) : (
-          horarios.map((horario) => {
-            const pasado = esHorarioPasado(horario.hora);
-            const disponibleReal = horario.disponible && !pasado;
-
-            let estadoTexto = 'Disponible';
-
-            if (pasado) {
-              estadoTexto = 'Horario pasado';
-            } else if (horario.bloqueado) {
-              estadoTexto = 'Bloqueado';
-            } else if (!horario.disponible) {
-              estadoTexto = 'Ocupado';
-            }
-
-            return (
+            {pacientes.map((paciente) => (
               <TouchableOpacity
-                key={horario.hora}
-                disabled={!disponibleReal}
-                onPress={() => reservarHorario(horario.hora)}
-                style={{
-                  padding: 15,
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                  opacity: disponibleReal ? 1 : 0.4,
-                  backgroundColor: pasado
-                    ? '#dcdcdc'
-                    : horario.bloqueado
-                    ? '#fecaca'
-                    : disponibleReal
-                    ? 'white'
-                    : '#dcdcdc',
-                }}
+                key={paciente.id}
+                onPress={() => setPacienteSeleccionado(paciente)}
+                style={cardStyle}
               >
-                <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-                  {horario.hora}
-                </Text>
-
-                <Text>{estadoTexto}</Text>
+                <Text style={cardTitle}>{paciente.nombre}</Text>
+                <Text style={cardSubtitle}>RUT: {paciente.rut}</Text>
               </TouchableOpacity>
-            );
-          })
+            ))}
+          </>
         )}
-      </ScrollView>
 
-      <View style={{ gap: 10 }}>
-        <Button
-          title="Cambiar profesional"
-          onPress={() => {
-            setProfesionalSeleccionado(null);
-            setHorarios([]);
-          }}
-        />
+        {pacienteSeleccionado && !profesionalSeleccionado && (
+          <>
+            <View style={summaryCard}>
+              <Text style={summaryLabel}>Paciente seleccionado</Text>
+              <Text style={summaryTitle}>{pacienteSeleccionado.nombre}</Text>
+              <Text style={summaryText}>{pacienteSeleccionado.rut}</Text>
+            </View>
 
-        <Button
-          title="Cambiar paciente"
-          onPress={() => {
-            setPacienteSeleccionado(null);
-            setProfesionalSeleccionado(null);
-            setHorarios([]);
-          }}
-        />
+            <Text style={sectionTitle}>Seleccionar profesional</Text>
+
+            {profesionales.map((profesional) => (
+              <TouchableOpacity
+                key={profesional.id}
+                onPress={() => setProfesionalSeleccionado(profesional)}
+                style={cardStyle}
+              >
+                <Text style={cardTitle}>{profesional.nombre}</Text>
+                <Text style={cardSubtitle}>
+                  {profesional.especialidad}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity onPress={limpiarSeleccion} style={secondaryButton}>
+              <Text style={secondaryButtonText}>Cambiar paciente</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {pacienteSeleccionado && profesionalSeleccionado && (
+          <>
+            <View style={summaryCard}>
+              <Text style={summaryLabel}>Reserva para</Text>
+              <Text style={summaryTitle}>{pacienteSeleccionado.nombre}</Text>
+              <Text style={summaryText}>
+                Profesional: {profesionalSeleccionado.nombre}
+              </Text>
+            </View>
+
+            <View style={dateCard}>
+              <Text style={dateLabel}>Fecha seleccionada</Text>
+              <Text style={dateText}>{fecha}</Text>
+
+              <View style={dateControls}>
+                <TouchableOpacity
+                  onPress={() => cambiarDia(-1)}
+                  style={outlineButton}
+                >
+                  <Text style={outlineButtonText}>← Día anterior</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => cambiarDia(1)}
+                  style={outlineButton}
+                >
+                  <Text style={outlineButtonText}>Día siguiente →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={sectionTitle}>Horarios</Text>
+
+            {cargando ? (
+              <View style={emptyCard}>
+                <Text>Cargando horarios...</Text>
+              </View>
+            ) : horarios.length === 0 ? (
+              <View style={emptyCard}>
+                <Text style={emptyTitle}>No hay horarios disponibles</Text>
+                <Text style={emptyText}>
+                  Prueba con otro día o profesional.
+                </Text>
+              </View>
+            ) : (
+              horarios.map((horario) => {
+                const pasado = esHorarioPasado(horario.hora);
+                const disponibleReal = horario.disponible && !pasado;
+
+                let estadoTexto = 'Disponible';
+
+                if (pasado) estadoTexto = 'Horario pasado';
+                else if (horario.bloqueado) estadoTexto = 'Bloqueado';
+                else if (!horario.disponible) estadoTexto = 'Ocupado';
+
+                return (
+                  <TouchableOpacity
+                    key={horario.hora}
+                    disabled={!disponibleReal}
+                    onPress={() => reservarHorario(horario.hora)}
+                    style={[
+                      horarioCard,
+                      disponibleReal && horarioAvailable,
+                      (!disponibleReal || pasado) && horarioDisabled,
+                      horario.bloqueado && horarioBlocked,
+                    ]}
+                  >
+                    <Text style={horarioHora}>{horario.hora}</Text>
+                    <Text style={horarioEstado}>{estadoTexto}</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
+            <TouchableOpacity
+              onPress={() => {
+                setProfesionalSeleccionado(null);
+                setHorarios([]);
+              }}
+              style={secondaryButton}
+            >
+              <Text style={secondaryButtonText}>Cambiar profesional</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={limpiarSeleccion} style={secondaryButton}>
+              <Text style={secondaryButtonText}>Cambiar paciente</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
+
+const centerStyle = {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+} as const;
+
+const heroStyle = {
+  paddingTop: 46,
+  paddingBottom: 34,
+  paddingHorizontal: 24,
+  borderBottomLeftRadius: 34,
+  borderBottomRightRadius: 34,
+} as const;
+
+const heroTitle = {
+  color: 'white',
+  fontSize: 27,
+  fontWeight: 'bold',
+} as const;
+
+const heroSubtitle = {
+  color: 'white',
+  marginTop: 8,
+  fontSize: 15,
+} as const;
+
+const contentStyle = {
+  padding: 20,
+} as const;
+
+const sectionTitle = {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: colors.text,
+  marginTop: 18,
+  marginBottom: 10,
+} as const;
+
+const cardStyle = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 16,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const cardTitle = {
+  fontSize: 17,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const cardSubtitle = {
+  color: colors.muted,
+  marginTop: 4,
+} as const;
+
+const summaryCard = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const summaryLabel = {
+  color: colors.muted,
+  fontSize: 13,
+} as const;
+
+const summaryTitle = {
+  color: colors.text,
+  fontSize: 20,
+  fontWeight: 'bold',
+  marginTop: 4,
+} as const;
+
+const summaryText = {
+  color: colors.muted,
+  marginTop: 4,
+} as const;
+
+const dateCard = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  marginTop: 14,
+  ...shadows.card,
+} as const;
+
+const dateLabel = {
+  color: colors.muted,
+  fontSize: 13,
+} as const;
+
+const dateText = {
+  color: colors.text,
+  fontSize: 22,
+  fontWeight: 'bold',
+  marginTop: 4,
+} as const;
+
+const dateControls = {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 14,
+} as const;
+
+const outlineButton = {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: colors.primary,
+  borderRadius: 12,
+  padding: 12,
+  alignItems: 'center',
+} as const;
+
+const outlineButtonText = {
+  color: colors.primary,
+  fontWeight: 'bold',
+  fontSize: 12,
+} as const;
+
+const horarioCard = {
+  padding: 15,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: colors.border,
+  marginBottom: 10,
+  backgroundColor: colors.card,
+  ...shadows.card,
+} as const;
+
+const horarioAvailable = {
+  borderColor: colors.primary,
+} as const;
+
+const horarioDisabled = {
+  backgroundColor: colors.disabled,
+  opacity: 0.65,
+} as const;
+
+const horarioBlocked = {
+  backgroundColor: colors.danger,
+} as const;
+
+const horarioHora = {
+  fontSize: 20,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const horarioEstado = {
+  marginTop: 4,
+  color: colors.muted,
+} as const;
+
+const secondaryButton = {
+  backgroundColor: colors.card,
+  padding: 15,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 12,
+  borderWidth: 1,
+  borderColor: colors.primary,
+} as const;
+
+const secondaryButtonText = {
+  color: colors.primary,
+  fontWeight: 'bold',
+} as const;
+
+const emptyCard = {
+  backgroundColor: colors.card,
+  padding: 18,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const emptyTitle = {
+  fontWeight: 'bold',
+  fontSize: 17,
+  color: colors.text,
+} as const;
+
+const emptyText = {
+  color: colors.muted,
+  marginTop: 5,
+} as const;

@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
-  Button,
 } from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { api } from '../services/api';
+import { colors, shadows } from '../constants/theme';
 
 type Usuario = {
   rol: string;
@@ -52,6 +54,7 @@ export default function PanelInternoScreen() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [citas, setCitas] = useState<Cita[]>([]);
+  const [cargando, setCargando] = useState(true);
 
   const [vista, setVista] = useState<Vista>('resumen');
   const [busqueda, setBusqueda] = useState('');
@@ -66,6 +69,8 @@ export default function PanelInternoScreen() {
 
   async function cargarDatos() {
     try {
+      setCargando(true);
+
       const usuarioRes = await api.get('/auth/me');
 
       if (
@@ -88,8 +93,10 @@ export default function PanelInternoScreen() {
 
       setPacientes(pacientesRes.data);
       setCitas(citasRes.data);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'No se pudo cargar la información');
+    } finally {
+      setCargando(false);
     }
   }
 
@@ -98,7 +105,6 @@ export default function PanelInternoScreen() {
     const ahora = new Date();
 
     let edad = ahora.getFullYear() - nacimiento.getFullYear();
-
     const mes = ahora.getMonth() - nacimiento.getMonth();
 
     if (
@@ -165,7 +171,6 @@ export default function PanelInternoScreen() {
     return citas
       .filter((cita) => {
         const fechaCita = cita.fechaHora.substring(0, 10);
-
         const coincideFecha = fechaCita === fechaFiltro;
 
         const coincideEstado =
@@ -204,235 +209,499 @@ export default function PanelInternoScreen() {
     };
   }, [citas, fechaFiltro]);
 
-  function colorEstado(estado: string) {
-    if (estado === 'PENDIENTE') return '#fff7cc';
-    if (estado === 'CONFIRMADA') return '#dcfce7';
-    if (estado === 'CANCELADA') return '#e5e5e5';
-    return 'white';
+  function estadoColor(estado: string) {
+    if (estado === 'PENDIENTE') return colors.warning;
+    if (estado === 'CONFIRMADA') return colors.success;
+    if (estado === 'CANCELADA') return colors.disabled;
+    return colors.card;
   }
 
-  if (!usuario) {
+  if (!usuario || cargando) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={centerStyle}>
         <Text>Cargando información...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 26, fontWeight: 'bold' }}>
-        Panel interno
-      </Text>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        style={heroStyle}
+      >
+        <Text style={heroTitle}>Panel interno</Text>
+        <Text style={heroSubtitle}>
+          Pacientes, citas y resumen administrativo
+        </Text>
+      </LinearGradient>
 
-      <Text style={{ marginTop: 4, color: '#555' }}>
-        Información administrativa de pacientes y citas
-      </Text>
+      <View style={contentStyle}>
+        <View style={tabsContainer}>
+          {(['resumen', 'pacientes', 'citas'] as Vista[]).map((item) => (
+            <TouchableOpacity
+              key={item}
+              onPress={() => setVista(item)}
+              style={[
+                tabButton,
+                vista === item && tabButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  tabText,
+                  vista === item && tabTextActive,
+                ]}
+              >
+                {item.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-        <Button title="Resumen" onPress={() => setVista('resumen')} />
-        <Button title="Pacientes" onPress={() => setVista('pacientes')} />
-        <Button title="Citas" onPress={() => setVista('citas')} />
-      </View>
+        <TextInput
+          placeholder="Buscar por nombre, RUT o profesional"
+          value={busqueda}
+          onChangeText={setBusqueda}
+          autoCapitalize="none"
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <TextInput
-        placeholder="Buscar por nombre, RUT o profesional"
-        value={busqueda}
-        onChangeText={setBusqueda}
-        autoCapitalize="none"
-        style={{
-          marginTop: 20,
-          borderWidth: 1,
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: 'white',
-        }}
-      />
+        {(vista === 'resumen' || vista === 'citas') && (
+          <>
+            <View style={dateCard}>
+              <Text style={dateLabel}>Fecha seleccionada</Text>
+              <Text style={dateText}>{fechaFiltro}</Text>
 
-      {(vista === 'resumen' || vista === 'citas') && (
-        <>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: 15,
-            }}
-          >
-            <Button title="←" onPress={() => cambiarDia(-1)} />
-            <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-              {fechaFiltro}
-            </Text>
-            <Button title="→" onPress={() => cambiarDia(1)} />
-          </View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {(['TODAS', 'PENDIENTE', 'CONFIRMADA', 'CANCELADA'] as FiltroEstado[]).map(
-              (estado) => (
+              <View style={dateControls}>
                 <TouchableOpacity
-                  key={estado}
-                  onPress={() => setEstadoFiltro(estado)}
-                  style={{
-                    padding: 10,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    backgroundColor:
-                      estadoFiltro === estado ? '#dbeafe' : 'white',
-                  }}
+                  onPress={() => cambiarDia(-1)}
+                  style={outlineButton}
                 >
-                  <Text>{estado}</Text>
+                  <Text style={outlineButtonText}>← Día anterior</Text>
                 </TouchableOpacity>
-              ),
-            )}
-          </View>
-        </>
-      )}
 
-      {vista === 'resumen' && (
-        <View style={{ marginTop: 20, gap: 10 }}>
-          <View style={cardStyle}>
-            <Text style={titleStyle}>Resumen del día</Text>
-            <Text>Total citas: {resumenDia.total}</Text>
-            <Text>Pendientes: {resumenDia.pendientes}</Text>
-            <Text>Confirmadas: {resumenDia.confirmadas}</Text>
-            <Text>Canceladas: {resumenDia.canceladas}</Text>
-          </View>
+                <TouchableOpacity
+                  onPress={() => cambiarDia(1)}
+                  style={outlineButton}
+                >
+                  <Text style={outlineButtonText}>Día siguiente →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-          <View style={cardStyle}>
-            <Text style={titleStyle}>Pacientes inscritos</Text>
-            <Text>Total pacientes: {pacientes.length}</Text>
-          </View>
+            <View style={filtersWrap}>
+              {(['TODAS', 'PENDIENTE', 'CONFIRMADA', 'CANCELADA'] as FiltroEstado[]).map(
+                (estado) => (
+                  <TouchableOpacity
+                    key={estado}
+                    onPress={() => setEstadoFiltro(estado)}
+                    style={[
+                      filterChip,
+                      estadoFiltro === estado && filterChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        filterChipText,
+                        estadoFiltro === estado && filterChipTextActive,
+                      ]}
+                    >
+                      {estado}
+                    </Text>
+                  </TouchableOpacity>
+                ),
+              )}
+            </View>
+          </>
+        )}
 
-          <View style={cardStyle}>
-            <Text style={titleStyle}>Próximas citas del día</Text>
+        {vista === 'resumen' && (
+          <>
+            <Text style={sectionTitle}>Resumen del día</Text>
+
+            <View style={statsGrid}>
+              <View style={statCard}>
+                <Text style={statNumber}>{resumenDia.total}</Text>
+                <Text style={statLabel}>Total</Text>
+              </View>
+
+              <View style={statCard}>
+                <Text style={statNumber}>{resumenDia.pendientes}</Text>
+                <Text style={statLabel}>Pendientes</Text>
+              </View>
+
+              <View style={statCard}>
+                <Text style={statNumber}>{resumenDia.confirmadas}</Text>
+                <Text style={statLabel}>Confirmadas</Text>
+              </View>
+
+              <View style={statCard}>
+                <Text style={statNumber}>{resumenDia.canceladas}</Text>
+                <Text style={statLabel}>Canceladas</Text>
+              </View>
+            </View>
+
+            <View style={cardStyle}>
+              <Text style={cardTitle}>Pacientes inscritos</Text>
+              <Text style={bigNumber}>{pacientes.length}</Text>
+              <Text style={mutedText}>Registros administrativos activos</Text>
+            </View>
+
+            <Text style={sectionTitle}>Citas del día</Text>
 
             {citasFiltradas.length === 0 ? (
-              <Text>No hay citas para esta fecha.</Text>
+              <View style={cardStyle}>
+                <Text style={cardTitle}>Sin citas</Text>
+                <Text style={mutedText}>No hay citas para esta fecha.</Text>
+              </View>
             ) : (
               citasFiltradas.map((cita) => (
                 <View
                   key={cita.id}
-                  style={{
-                    marginTop: 10,
-                    padding: 10,
-                    borderRadius: 8,
-                    backgroundColor: colorEstado(cita.estado),
-                  }}
+                  style={[
+                    cardStyle,
+                    { backgroundColor: estadoColor(cita.estado) },
+                  ]}
                 >
-                  <Text style={{ fontWeight: 'bold' }}>
-                    {formatearHora(cita.fechaHora)} -{' '}
-                    {cita.paciente?.nombre}
+                  <Text style={cardTitle}>
+                    {formatearHora(cita.fechaHora)} - {cita.paciente?.nombre}
                   </Text>
-                  <Text>{cita.profesional?.nombre}</Text>
-                  <Text>{cita.estado}</Text>
+                  <Text style={mutedText}>{cita.profesional?.nombre}</Text>
+                  <Text style={stateText}>{cita.estado}</Text>
                 </View>
               ))
             )}
-          </View>
-        </View>
-      )}
+          </>
+        )}
 
-      {vista === 'pacientes' && (
-        <View style={{ marginTop: 20 }}>
-          <Text style={titleStyle}>Pacientes inscritos</Text>
+        {vista === 'pacientes' && (
+          <>
+            <Text style={sectionTitle}>Pacientes inscritos</Text>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-            {(['nombre', 'edad', 'rut'] as OrdenPacientes[]).map((orden) => (
-              <TouchableOpacity
-                key={orden}
-                onPress={() => setOrdenPacientes(orden)}
-                style={{
-                  padding: 10,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  backgroundColor:
-                    ordenPacientes === orden ? '#dbeafe' : 'white',
-                }}
-              >
-                <Text>Orden: {orden}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={{ marginTop: 12 }}>
-            Resultados: {pacientesFiltrados.length}
-          </Text>
-
-          {pacientesFiltrados.map((paciente) => (
-            <View key={paciente.id} style={cardStyle}>
-              <Text style={titleStyle}>{paciente.nombre}</Text>
-              <Text>RUT: {paciente.rut}</Text>
-              <Text>Edad: {calcularEdad(paciente.fechaNacimiento)} años</Text>
-              <Text>
-                Nacimiento: {formatearFecha(paciente.fechaNacimiento)}
-              </Text>
-              <Text>Email: {paciente.email || 'No registrado'}</Text>
-              <Text>Teléfono: {paciente.telefono || 'No registrado'}</Text>
+            <View style={filtersWrap}>
+              {(['nombre', 'edad', 'rut'] as OrdenPacientes[]).map((orden) => (
+                <TouchableOpacity
+                  key={orden}
+                  onPress={() => setOrdenPacientes(orden)}
+                  style={[
+                    filterChip,
+                    ordenPacientes === orden && filterChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      filterChipText,
+                      ordenPacientes === orden && filterChipTextActive,
+                    ]}
+                  >
+                    Orden: {orden}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          ))}
-        </View>
-      )}
 
-      {vista === 'citas' && (
-        <View style={{ marginTop: 20 }}>
-          <Text style={titleStyle}>Citas del día</Text>
-          <Text style={{ marginTop: 5 }}>
-            Resultados: {citasFiltradas.length}
-          </Text>
+            <Text style={resultText}>
+              Resultados: {pacientesFiltrados.length}
+            </Text>
 
-          {citasFiltradas.length === 0 ? (
-            <View style={cardStyle}>
-              <Text>No hay citas con estos filtros.</Text>
-            </View>
-          ) : (
-            citasFiltradas.map((cita) => (
-              <View
-                key={cita.id}
-                style={[
-                  cardStyle,
-                  {
-                    backgroundColor: colorEstado(cita.estado),
-                  },
-                ]}
-              >
-                <Text style={titleStyle}>
-                  {formatearHora(cita.fechaHora)} - {cita.estado}
+            {pacientesFiltrados.map((paciente) => (
+              <View key={paciente.id} style={cardStyle}>
+                <Text style={cardTitle}>{paciente.nombre}</Text>
+                <Text style={mutedText}>RUT: {paciente.rut}</Text>
+                <Text style={valueText}>
+                  Edad: {calcularEdad(paciente.fechaNacimiento)} años
                 </Text>
-
-                <Text>Paciente: {cita.paciente?.nombre}</Text>
-                <Text>RUT: {cita.paciente?.rut}</Text>
-                <Text>
-                  Edad:{' '}
-                  {cita.paciente
-                    ? calcularEdad(cita.paciente.fechaNacimiento)
-                    : 'Sin dato'}
+                <Text style={valueText}>
+                  Nacimiento: {formatearFecha(paciente.fechaNacimiento)}
                 </Text>
-
-                <Text style={{ marginTop: 8 }}>
-                  Profesional: {cita.profesional?.nombre}
+                <Text style={valueText}>
+                  Email: {paciente.email || 'No registrado'}
                 </Text>
-                <Text>Especialidad: {cita.profesional?.especialidad}</Text>
+                <Text style={valueText}>
+                  Teléfono: {paciente.telefono || 'No registrado'}
+                </Text>
               </View>
-            ))
-          )}
-        </View>
-      )}
+            ))}
+          </>
+        )}
 
-      <View style={{ height: 30 }} />
+        {vista === 'citas' && (
+          <>
+            <Text style={sectionTitle}>Citas del día</Text>
+            <Text style={resultText}>
+              Resultados: {citasFiltradas.length}
+            </Text>
+
+            {citasFiltradas.length === 0 ? (
+              <View style={cardStyle}>
+                <Text style={cardTitle}>Sin resultados</Text>
+                <Text style={mutedText}>
+                  No hay citas con los filtros seleccionados.
+                </Text>
+              </View>
+            ) : (
+              citasFiltradas.map((cita) => (
+                <View
+                  key={cita.id}
+                  style={[
+                    cardStyle,
+                    { backgroundColor: estadoColor(cita.estado) },
+                  ]}
+                >
+                  <Text style={cardTitle}>
+                    {formatearHora(cita.fechaHora)} - {cita.estado}
+                  </Text>
+
+                  <Text style={valueText}>
+                    Paciente: {cita.paciente?.nombre}
+                  </Text>
+                  <Text style={valueText}>RUT: {cita.paciente?.rut}</Text>
+                  <Text style={valueText}>
+                    Edad:{' '}
+                    {cita.paciente
+                      ? calcularEdad(cita.paciente.fechaNacimiento)
+                      : 'Sin dato'}
+                  </Text>
+
+                  <Text style={valueText}>
+                    Profesional: {cita.profesional?.nombre}
+                  </Text>
+                  <Text style={valueText}>
+                    Especialidad: {cita.profesional?.especialidad}
+                  </Text>
+                </View>
+              ))
+            )}
+          </>
+        )}
+
+        <View style={{ height: 30 }} />
+      </View>
     </ScrollView>
   );
 }
 
-const cardStyle = {
-  marginTop: 12,
-  padding: 14,
-  borderWidth: 1,
-  borderRadius: 10,
-  backgroundColor: 'white',
+const centerStyle = {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
 } as const;
 
-const titleStyle = {
+const heroStyle = {
+  paddingTop: 46,
+  paddingBottom: 34,
+  paddingHorizontal: 24,
+  borderBottomLeftRadius: 34,
+  borderBottomRightRadius: 34,
+} as const;
+
+const heroTitle = {
+  color: 'white',
+  fontSize: 28,
+  fontWeight: 'bold',
+} as const;
+
+const heroSubtitle = {
+  color: 'white',
+  marginTop: 8,
+  fontSize: 15,
+} as const;
+
+const contentStyle = {
+  padding: 20,
+} as const;
+
+const tabsContainer = {
+  flexDirection: 'row',
+  gap: 8,
+  marginBottom: 14,
+} as const;
+
+const tabButton = {
+  flex: 1,
+  backgroundColor: colors.card,
+  padding: 12,
+  borderRadius: 14,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: colors.border,
+} as const;
+
+const tabButtonActive = {
+  backgroundColor: colors.primary,
+  borderColor: colors.primary,
+} as const;
+
+const tabText = {
+  color: colors.muted,
+  fontWeight: 'bold',
+  fontSize: 11,
+} as const;
+
+const tabTextActive = {
+  color: 'white',
+} as const;
+
+const inputStyle = {
+  backgroundColor: colors.card,
+  borderWidth: 1,
+  borderColor: colors.border,
+  padding: 14,
+  borderRadius: 14,
+  marginBottom: 14,
+} as const;
+
+const dateCard = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const dateLabel = {
+  color: colors.muted,
+  fontSize: 13,
+} as const;
+
+const dateText = {
+  color: colors.text,
+  fontSize: 22,
+  fontWeight: 'bold',
+  marginTop: 4,
+} as const;
+
+const dateControls = {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 14,
+} as const;
+
+const outlineButton = {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: colors.primary,
+  borderRadius: 12,
+  padding: 12,
+  alignItems: 'center',
+} as const;
+
+const outlineButtonText = {
+  color: colors.primary,
+  fontWeight: 'bold',
+  fontSize: 12,
+} as const;
+
+const filtersWrap = {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 14,
+  marginBottom: 4,
+} as const;
+
+const filterChip = {
+  paddingVertical: 9,
+  paddingHorizontal: 12,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: colors.border,
+  backgroundColor: colors.card,
+} as const;
+
+const filterChipActive = {
+  backgroundColor: colors.primary,
+  borderColor: colors.primary,
+} as const;
+
+const filterChipText = {
+  color: colors.muted,
+  fontWeight: 'bold',
+  fontSize: 12,
+} as const;
+
+const filterChipTextActive = {
+  color: 'white',
+} as const;
+
+const sectionTitle = {
   fontSize: 18,
   fontWeight: 'bold',
-  marginBottom: 6,
+  color: colors.text,
+  marginTop: 20,
+  marginBottom: 10,
+} as const;
+
+const statsGrid = {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 10,
+} as const;
+
+const statCard = {
+  width: '48%',
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const statNumber = {
+  fontSize: 26,
+  fontWeight: 'bold',
+  color: colors.primary,
+} as const;
+
+const statLabel = {
+  color: colors.muted,
+  marginTop: 4,
+} as const;
+
+const cardStyle = {
+  backgroundColor: colors.card,
+  padding: 16,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  marginBottom: 12,
+  ...shadows.card,
+} as const;
+
+const cardTitle = {
+  fontSize: 17,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const bigNumber = {
+  fontSize: 34,
+  fontWeight: 'bold',
+  color: colors.primary,
+  marginTop: 6,
+} as const;
+
+const mutedText = {
+  color: colors.muted,
+  marginTop: 4,
+} as const;
+
+const valueText = {
+  color: colors.text,
+  marginTop: 5,
+} as const;
+
+const stateText = {
+  marginTop: 8,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const resultText = {
+  color: colors.muted,
+  marginBottom: 10,
 } as const;

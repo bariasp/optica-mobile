@@ -3,12 +3,15 @@ import {
   View,
   Text,
   TextInput,
-  Button,
+  TouchableOpacity,
   Alert,
   ScrollView,
 } from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { api } from '../services/api';
+import { colors, shadows } from '../constants/theme';
 
 import {
   validarEmail,
@@ -101,66 +104,133 @@ export default function CrearPacienteScreen() {
 
   if (usuario && usuario.rol !== 'ADMIN') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={centerStyle}>
         <Text>Acceso restringido</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 20, gap: 12 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold' }}>
-        Crear paciente
-      </Text>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        style={heroStyle}
+      >
+        <Text style={heroTitle}>Crear paciente</Text>
+        <Text style={heroSubtitle}>
+          Registra un nuevo paciente para gestionar sus citas
+        </Text>
+      </LinearGradient>
 
-      <TextInput
-        placeholder="Nombre completo"
-        value={nombre}
-        onChangeText={setNombre}
-        style={inputStyle}
-      />
+      <View style={formCard}>
+        <TextInput
+          placeholder="Nombre completo"
+          value={nombre}
+          onChangeText={setNombre}
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <TextInput
-        placeholder="Correo"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        style={inputStyle}
-      />
+        <TextInput
+          placeholder="Correo electrónico"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <TextInput
-        placeholder="Contraseña"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={inputStyle}
-      />
+        <TextInput
+          placeholder="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <TextInput
-        placeholder="RUT ejemplo: 12345678-9"
-        value={rut}
-        onChangeText={setRut}
-        autoCapitalize="characters"
-        style={inputStyle}
-      />
+        <TextInput
+          placeholder="RUT ejemplo: 12345678-9"
+          value={rut}
+          onChangeText={setRut}
+          autoCapitalize="characters"
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <TextInput
-        placeholder="Fecha nacimiento YYYY-MM-DD"
-        value={fechaNacimiento}
-        onChangeText={setFechaNacimiento}
-        keyboardType="numbers-and-punctuation"
-        style={inputStyle}
-      />
+        <TextInput
+          placeholder="Fecha nacimiento YYYY-MM-DD"
+          value={fechaNacimiento}
+          onChangeText={setFechaNacimiento}
+          keyboardType="numbers-and-punctuation"
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
 
-      <Button title="Crear paciente" onPress={crearPaciente} />
+        <TouchableOpacity onPress={crearPaciente} style={primaryButton}>
+          <Text style={primaryButtonText}>Crear paciente</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
-const inputStyle = {
+const centerStyle = {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+} as const;
+
+const heroStyle = {
+  paddingTop: 46,
+  paddingBottom: 34,
+  paddingHorizontal: 24,
+  borderBottomLeftRadius: 34,
+  borderBottomRightRadius: 34,
+} as const;
+
+const heroTitle = {
+  color: 'white',
+  fontSize: 28,
+  fontWeight: 'bold',
+} as const;
+
+const heroSubtitle = {
+  color: 'white',
+  marginTop: 8,
+  fontSize: 15,
+} as const;
+
+const formCard = {
+  backgroundColor: colors.card,
+  margin: 20,
+  padding: 20,
+  borderRadius: 18,
   borderWidth: 1,
-  padding: 12,
-  borderRadius: 8,
-  backgroundColor: 'white',
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const inputStyle = {
+  backgroundColor: '#fff',
+  borderWidth: 1,
+  borderColor: colors.border,
+  padding: 14,
+  borderRadius: 14,
+  marginBottom: 12,
+} as const;
+
+const primaryButton = {
+  backgroundColor: colors.primary,
+  padding: 15,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 8,
+} as const;
+
+const primaryButtonText = {
+  color: 'white',
+  fontWeight: 'bold',
+  fontSize: 16,
 } as const;

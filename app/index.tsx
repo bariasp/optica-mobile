@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Button, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  Image,
+} from 'react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
+
 import { api } from '../services/api';
+import { colors, shadows } from '../constants/theme';
 
 import {
   validarEmail,
@@ -62,46 +73,150 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 20, gap: 12 }}>
-      <Text style={{ fontSize: 26, fontWeight: 'bold' }}>
-        Óptica Zeus
-      </Text>
-
-      <TextInput
-        placeholder="Correo"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        style={{
-          borderWidth: 1,
-          padding: 12,
-          borderRadius: 8,
-          backgroundColor: 'white',
-        }}
-      />
-
-      <TextInput
-        placeholder="Contraseña"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        style={{
-          borderWidth: 1,
-          padding: 12,
-          borderRadius: 8,
-          backgroundColor: 'white',
-        }}
-      />
-
-      <Button title="Ingresar" onPress={handleLogin} />
-
-      <View style={{ marginTop: 10 }}>
-        <Button
-          title="Crear cuenta"
-          onPress={() => router.push('/registro')}
+    <ScrollView
+      contentContainerStyle={{
+        flexGrow: 1,
+        backgroundColor: colors.background,
+      }}
+    >
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        style={heroStyle}
+      >
+        <Image
+          source={require('../assets/zeus-logo-rojo.png')}
+          style={logoStyle}
+          resizeMode="contain"
         />
+
+        <Text style={heroText}>
+          Agenda y gestiona tus horas de atención
+        </Text>
+      </LinearGradient>
+
+      <View style={formCard}>
+        <Text style={title}>Iniciar sesión</Text>
+
+        <Text style={subtitle}>
+          Ingresa con tu cuenta para acceder a tus citas.
+        </Text>
+
+        <TextInput
+          placeholder="Correo electrónico"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
+
+        <TextInput
+          placeholder="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholderTextColor={colors.muted}
+          style={inputStyle}
+        />
+
+        <TouchableOpacity onPress={handleLogin} style={primaryButton}>
+          <Text style={primaryButtonText}>Ingresar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push('/registro')}
+          style={secondaryButton}
+        >
+          <Text style={secondaryButtonText}>
+            Crear cuenta de paciente
+          </Text>
+        </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
+
+const heroStyle = {
+  paddingTop: 60,
+  paddingBottom: 50,
+  paddingHorizontal: 24,
+  alignItems: 'center',
+  borderBottomLeftRadius: 34,
+  borderBottomRightRadius: 34,
+} as const;
+
+const logoStyle = {
+  width: 170,
+  height: 120,
+  borderRadius: 22,
+} as const;
+
+const heroText = {
+  color: 'white',
+  marginTop: 18,
+  fontSize: 16,
+  textAlign: 'center',
+  fontWeight: '600',
+} as const;
+
+const formCard = {
+  backgroundColor: colors.card,
+  margin: 20,
+  marginTop: 28,
+  padding: 20,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: colors.border,
+  ...shadows.card,
+} as const;
+
+const title = {
+  fontSize: 26,
+  fontWeight: 'bold',
+  color: colors.text,
+} as const;
+
+const subtitle = {
+  color: colors.muted,
+  marginTop: 6,
+  marginBottom: 20,
+} as const;
+
+const inputStyle = {
+  backgroundColor: '#fff',
+  borderWidth: 1,
+  borderColor: colors.border,
+  padding: 14,
+  borderRadius: 14,
+  marginBottom: 12,
+} as const;
+
+const primaryButton = {
+  backgroundColor: colors.primary,
+  padding: 15,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 6,
+} as const;
+
+const primaryButtonText = {
+  color: 'white',
+  fontWeight: 'bold',
+  fontSize: 16,
+} as const;
+
+const secondaryButton = {
+  backgroundColor: '#fff',
+  padding: 15,
+  borderRadius: 14,
+  alignItems: 'center',
+  marginTop: 12,
+  borderWidth: 1,
+  borderColor: colors.primary,
+} as const;
+
+const secondaryButtonText = {
+  color: colors.primary,
+  fontWeight: 'bold',
+} as const;
